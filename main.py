@@ -2,6 +2,8 @@ from requests import get
 from requests.exceptions import RequestException
 from contextlib import closing
 from bs4 import BeautifulSoup
+import re
+
 
 def simple_get(url):
     """
@@ -39,10 +41,53 @@ def log_error(e):
     """
     print(e)
 
-url = 'https://www.bbc.com/news/world-europe-53455142'
+def scrapNews(url,website):
+    raw_html = simple_get(url)
+    html = BeautifulSoup(raw_html, 'html.parser')
+    switcher = {
+        'BBC':getBBCArticle,
+        'TOI':getTOIArticle,
+        'Hindu':getHinduArticle
+    }
+    func=switcher.get(website,lambda :'Invalid')
+    return func(html)
+        
 
-raw_html = simple_get(url)
-html = BeautifulSoup(raw_html, 'html.parser')
-articleTag = html.find('div',class_ = 'story-body__inner')
-for p in articleTag.findAll('p'):
-        print(p.text)
+def getBBCArticle(html):
+    articleTag = html.find('div',class_ = 'story-body__inner')
+    result = ''
+    for ptag in articleTag.findAll('p'):
+            result += ptag.text
+    return (result)
+
+def getHinduArticle(html):
+    articleTag = html.find('div',id = re.compile('content-body-.*'))
+    result = ''
+    for tag in articleTag.children:
+        if tag.name is not None :
+            if'atd-ad' not in tag.get('class',[]) :
+                x = re.search('^Also read.*', tag.get_text())
+                if not x:
+                    result += (tag.get_text())
+    return (result)
+
+def getTOIArticle(html):
+    articleTag = html.find('div',class_ = '_1_Akb')
+    result = ''
+    for tag in articleTag.children:
+        if tag is not None and tag.string is not None: 
+            result += (tag.string)
+    return (result)
+    
+#Scraping BBC.com 
+print(scrapNews('https://www.bbc.com/news/world-europe-53455142','BBC'))
+ 
+#Scraping timesofindia.com 
+print(scrapNews('https://timesofindia.indiatimes.com/india/govts-cowardly-actions-will-further-embolden-china-rahul-gandhi-on-lac-row/articleshow/77039309.cms','TOI'))
+
+#Scraping timesofindia.com 
+print(scrapNews('https://timesofindia.indiatimes.com/world/middle-east/iran-estimates-it-has-25-million-coronavirus-infections/articleshow/77036293.cms','TOI'))
+
+#Scraping thehindu.com 
+print(scrapNews('http://www.thehindu.com/news/national/tamil-nadu/analysis-for-tamil-nadus-ruling-aiadmk-sasikala-factor-refuses-to-fade-away/article32121015.ece?homepage=true',
+'Hindu'))
